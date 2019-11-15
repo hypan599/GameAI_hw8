@@ -593,7 +593,7 @@ Sometimes you will need to create new tensors from scratch. Here is a quick chea
 It is generally a good idea to indicate whether a tensor lives on the CPU or the GPU. The ```DEVICE``` global is set to ```"cuda"``` if a GPU is available or set to ```"cpu"``` otherwise. When you create a tensor you can indicate where it lives: ```torch.zeros(10, device="cuda")``` or ```torch.zeros(10, device="cpu")``` or ```torch.zeros(10, device=DEVICE)```. You can move tensors from CPU to GPU or vice versa by using ```tensor.to()```.
 
 When creating a tensor you might also want to specify the type of data that is being stored. For example:
-* ```torch.zeros(10, dtype=torch.uint8)``` creates a tensor of bytes.
+* ```torch.zeros(10, dtype=torch.bool)``` creates a tensor of bytes.
 * ```torch.zeros(10, dtype=torch.long)``` creates a tensor of longs.
 * ```torch.zeros(10, dtype=torch.float)``` creates a tensor of floats.
 

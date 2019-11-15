@@ -329,7 +329,7 @@ def testMakeBatch():
     assert(type(actions_batch) == torch.Tensor and actions_batch.size() == (batch_size, 1)), "actions batch not correct shape."
     assert(type(next_states_batch) == torch.Tensor and next_states_batch.size() == (batch_size, 3, 80, 80)), "next states batch not correct shape."
     assert(type(rewards_batch) == torch.Tensor and rewards_batch.size() == (batch_size, 1)), "rewards batch not correct shape."
-    assert(type(non_final_mask) == type(torch.tensor(batch_size, dtype=torch.uint8, device=DEVICE)) and non_final_mask.size()[0] == batch_size), "non-final mask not correct shape."
+    assert(type(non_final_mask) == type(torch.tensor(batch_size, dtype=torch.bool, device=DEVICE)) and non_final_mask.size()[0] == batch_size), "non-final mask not correct shape."
 
     # Test mask
     test_replay_memory = ReplayMemory(batch_size)
@@ -433,7 +433,7 @@ def testPredictNextStateUtilities():
     # First option to try is that the batch is full sized.
     try:
         next_states_batch = torch.ones(batch_size, 3, 80, 80, device=DEVICE)
-        non_final_mask = torch.ones(batch_size, dtype=torch.uint8, device=DEVICE)
+        non_final_mask = torch.ones(batch_size, dtype=torch.bool, device=DEVICE)
         for i in range(batch_size):
             if i % 2 == 1:
                 next_states_batch[i].fill_(0)
@@ -451,7 +451,7 @@ def testPredictNextStateUtilities():
         # Next option is that batch is not full sized.
         try:
             next_states_batch = torch.ones(batch_size-1, 3, 80, 80, device=DEVICE)
-            non_final_mask = torch.ones(batch_size, dtype=torch.uint8, device=DEVICE)
+            non_final_mask = torch.ones(batch_size, dtype=torch.bool, device=DEVICE)
             non_final_mask[0] = 0
             next_state_values = doPredictNextStateUtilities(net, next_states_batch, non_final_mask, batch_size)
             assert(type(next_state_values) == torch.Tensor and next_state_values.size()[0] == batch_size), "Return value not correctd shape (attempt 2)."

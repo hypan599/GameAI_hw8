@@ -572,10 +572,11 @@ def initializeOptimizer(parameters):
 def select_action(state, policy_net, num_actions, epsilon, steps_done=0, bootstrap_threshold=0):
     action = None
     new_epsilon = epsilon
-    # WRITE YOUR CODE BELOW HERE DOING
+    # WRITE YOUR CODE BELOW HERE DONE
     # A good schedule for epsilon could be linear in terms
     # of the number of steps or exponential, asymptoting
     # to zero
+    # todo: tune epsilon strategy
     if random.random() < epsilon:  # random
         action = torch.tensor([[random.randrange(num_actions)]], device=DEVICE, dtype=torch.long)
     else:  # greedy
@@ -610,7 +611,10 @@ def doMakeBatch(replay_memory, batch_size):
     for state, action, next_state, reward in samples:
         states_batch.append(state)
         actions_batch.append(action)
-        next_states_batch.append(next_state)
+        if next_state is None:
+            next_states_batch.append(torch.zeros(state.size()))
+        else:
+            next_states_batch.append(next_state)
         rewards_batch.append(reward)
         non_final_mask.append((next_state is not None))
 
@@ -654,9 +658,8 @@ def doPredictQValues(policy_net, states_batch, actions_batch):
 def doPredictNextStateUtilities(policy_net, next_states_batch, non_final_mask, batch_size):
     next_state_values = torch.zeros(batch_size, device=DEVICE)
     # WRITE YOUR CODE BELOW HERE DONE
-
-    new_input = [next_states_batch[i] for i in range(batch_size) if non_final_mask[i]]
-    new_input = torch.tensor(new_input, device=DEVICE)
+    new_input = [next_states_batch[i].unsqueeze(0) for i in range(batch_size) if non_final_mask[i]]
+    new_input = torch.cat(new_input, 0)
 
     new_output = policy_net(new_input)
     new_output, _ = torch.max(new_output, 1)
@@ -681,7 +684,7 @@ def doComputeExpectedQValues(next_state_values, rewards_batch, gamma):
     expected_state_action_values = None
     # WRITE YOUR CODE BELOW HERE DONE
 
-    expected_state_action_values = rewards_batch + gamma * next_state_values.max(1)[0]
+    expected_state_action_values = rewards_batch + gamma * next_state_values.max()
 
     # WRITE YOUR CODE ABOVE HERE
     return expected_state_action_values

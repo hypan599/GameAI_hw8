@@ -549,7 +549,7 @@ def initializeOptimizer(parameters):
     optimizer = None
     # WRITE YOUR CODE BELOW HERE DONE
 
-    print("initializing optimizer with parameters: ", parameters)
+    # print("initializing optimizer with parameters: ", parameters)
     optimizer = optim.Adam(parameters)
 
     # WRITE YOUR CODE ABOVE HERE
@@ -670,6 +670,7 @@ def doPredictNextStateUtilities(policy_net, next_states_batch, non_final_mask, b
             next_state_values[i] = new_output[j]
             j += 1
 
+    next_state_values = next_state_values.unsqueeze(1)
     # WRITE YOUR CODE ABOVE HERE
     return next_state_values.detach()
 
@@ -684,7 +685,7 @@ def doComputeExpectedQValues(next_state_values, rewards_batch, gamma):
     expected_state_action_values = None
     # WRITE YOUR CODE BELOW HERE DONE
 
-    expected_state_action_values = rewards_batch + gamma * next_state_values.max()
+    expected_state_action_values = rewards_batch + gamma * next_state_values
 
     # WRITE YOUR CODE ABOVE HERE
     return expected_state_action_values
@@ -714,7 +715,7 @@ def doComputeLoss(state_action_values, expected_state_action_values):
 # There is no output
 def doBackprop(loss, parameters):
     # WRITE YOUR CODE BELOW HERE DONE
-    print("in doBackprop", parameters)
+    # print("in doBackprop", parameters)
     loss.backward()
     # WRITE YOUR CODE ABOVE HERE
     return None

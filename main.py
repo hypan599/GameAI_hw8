@@ -1,14 +1,15 @@
 ############################################################
 
 def in_ipynb():
-  try:
-    result = get_ipython().__class__.__name__
-    if 'Shell' in result:
-      return True
-    else:
-      return False
-  except:
-    return False
+    try:
+        result = get_ipython().__class__.__name__
+        if 'Shell' in result:
+            return True
+        else:
+            return False
+    except:
+        return False
+
 
 IN_PYNB = in_ipynb()
 
@@ -20,16 +21,11 @@ import random
 import numpy as np
 from collections import namedtuple
 from itertools import count
-from PIL import Image 
-# pip install Pillow
-# pip install torch
-# pip install torchvision
+from PIL import Image
 
 from coinrun import setup_utils, make
 import coinrun.main_utils as utils
 from coinrun.config import Config
-if not IN_PYNB:
-    from gym.envs.classic_control import rendering
 from coinrun import policies, wrappers
 
 import torch
@@ -42,20 +38,21 @@ import os
 import argparse
 import pdb
 
+if not IN_PYNB:
+    from gym.envs.classic_control import rendering
 
 ###########################################################
-
 # Game seed information
-NUM_LEVELS = 1 # repeat the same level over and over
-EASY_LEVEL = 1 # Start on a very small map, no enemies
-EASY_LEVEL2 = 5 # Very small map, no enemies
-MEDIUM_LEVEL = 20 # Medium length, no enemies
-MEDIUM_LEVEL2 = 45 # Medium length, no enemies
-ONE_MONSTER = 10 # Short map with one monster
-HARD_LEVEL = 7 # Longer and with monsters
-LAVA_LEVEL = 3 # Longer and with lava and pits
-
+NUM_LEVELS = 1  # repeat the same level over and over
+EASY_LEVEL = 1  # Start on a very small map, no enemies
+EASY_LEVEL2 = 5  # Very small map, no enemies
+MEDIUM_LEVEL = 20  # Medium length, no enemies
+MEDIUM_LEVEL2 = 45  # Medium length, no enemies
+ONE_MONSTER = 10  # Short map with one monster
+HARD_LEVEL = 7  # Longer and with monsters
+LAVA_LEVEL = 3  # Longer and with lava and pits
 ###########################################################
+
 '''
 Colab instructions:
 New notebook
@@ -85,7 +82,7 @@ import sys
 sys.path.insert(0, 'coinrun-game-ai-assignment')
 
 [7]
-### Testing coinrun with random agent
+# Testing coinrun with random agent
 from coinrun.random_agent import random_agent
 random_agent(max_steps=10)
 
@@ -93,10 +90,8 @@ random_agent(max_steps=10)
 from main import *
 '''
 
-
-
 ###########################################################
-### ARGPARSE
+# ARGPARSE
 
 parser = argparse.ArgumentParser(description='Train CoinRun DQN agent.')
 parser.add_argument('--render', action="store_true", default=False)
@@ -112,24 +107,21 @@ args = None
 if not IN_PYNB:
     args = parser.parse_args()
 
-
-
 ###########################################################
-### CONSTANTS
+# CONSTANTS
 
 # if gpu is to be used
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Resize the screen to this
-RESIZE_CONST = 40 
+RESIZE_CONST = 40
 
 # Defaults
 RENDER_SCREEN = args.render if not IN_PYNB else False
 SAVE_FILENAME = args.save if not IN_PYNB else 'saved.model'
 LOAD_FILENAME = args.load if not IN_PYNB else 'saved.model'
-MODEL_PATH = args.model_path if not IN_PYNB else 'saved_models' 
+MODEL_PATH = args.model_path if not IN_PYNB else 'saved_models'
 SEED = args.seed if not IN_PYNB else EASY_LEVEL
-
 
 # Don't play with this
 EVAL_EPSILON = 0.1
@@ -139,41 +131,38 @@ TIMEOUT = 1000
 COIN_REWARD = 100
 
 # You may want to change these, but is probably not necessary
-BATCH_SIZE = 128            # How many replay experiences to run through neural net at once
-GAMMA = 0.999               # How much to discount the future [0..1]
-BOOTSTRAP = 10000           # How many steps to run to fill up replay memory before training starts
-TARGET_UPDATE = 0           # Delays updating the network for loss calculations. 0=don't delay, or 1+ number of episodes
-REPLAY_CAPACITY = 10000     # How big is the replay memory
-EPSILON = 0.9               # Use random action if less than epsilon [0..1]
-EVAL_INTERVAL = 10          # How many episodes of training before evaluation
-RANDOM_SEED = None          # Seed for random number generator, for reproducability, use None for random seed
-NUM_EPISODES = args.episodes if not IN_PYNB else 1000   # Max number of training episodes
-
-
-
-
+BATCH_SIZE = 128  # How many replay experiences to run through neural net at once
+GAMMA = 0.999  # How much to discount the future [0..1]
+BOOTSTRAP = 10000  # How many steps to run to fill up replay memory before training starts
+TARGET_UPDATE = 0  # Delays updating the network for loss calculations. 0=don't delay, or 1+ number of episodes
+REPLAY_CAPACITY = 10000  # How big is the replay memory
+EPSILON = 0.9  # Use random action if less than epsilon [0..1]
+EVAL_INTERVAL = 10  # How many episodes of training before evaluation
+RANDOM_SEED = None  # Seed for random number generator, for reproducability, use None for random seed
+NUM_EPISODES = args.episodes if not IN_PYNB else 1000  # Max number of training episodes
 
 ############################################################
-### HELPERS
+# HELPERS
 
-### Data structure for holding experiences for replay
+# Data structure for holding experiences for replay
 Transition = namedtuple('Transition',
                         ('state', 'action', 'next_state', 'reward'))
 
-### Function for resizing the screen
+# Function for resizing the screen
 resize = T.Compose([T.ToPILImage(),
                     T.Resize(RESIZE_CONST, interpolation=Image.CUBIC),
                     T.ToTensor()])
 
-### Take the environment and return a tensor containing screen data as a 3D tensor containing (color, height, width) information.
-### Optional: the screen may be manipulated, for example, it could be cropped
+
+# Take the environment and return a tensor containing screen data as a 3D tensor containing (color, height, width) information.
+# Optional: the screen may be manipulated, for example, it could be cropped
 def get_screen(env):
     # Returned screen requested by gym is 512x512x3. Transpose it into torch order (Color, Height, Width).
     screen = env.render(mode='rgb_array').transpose((2, 0, 1))
     _, screen_height, screen_width = screen.shape
-    ### DO ANY SCREEN MANIPULATIONS NECESSARY (IF ANY)
+    # DO ANY SCREEN MANIPULATIONS NECESSARY (IF ANY)
 
-    ### END SCREEN MANIPULATIONS
+    # END SCREEN MANIPULATIONS
     # Convert to float, rescale, convert to torch tensor
     # (this doesn't require a copy)
     screen = np.ascontiguousarray(screen, dtype=np.float32) / 255
@@ -181,31 +170,34 @@ def get_screen(env):
     # Resize, and add a batch dimension (BCHW)
     return resize(screen).unsqueeze(0).to(DEVICE)
 
-### Save the model. Extra information can be added to the end of the filename
-def save_model(model, filename, extras = None):
+
+# Save the model. Extra information can be added to the end of the filename
+def save_model(model, filename, extras=None):
     if extras is not None:
         filename = filename + '.' + str(extras)
     print("Saving", filename, "...")
     torch.save(model, os.path.join(MODEL_PATH, filename))
     print("Done saving.")
- 
-### Load the model. If there are multiple versions with extra information at the
-### end of the filename, get the latest.
-def load_model(filename, extras = None):
+
+
+# Load the model. If there are multiple versions with extra information at the
+# end of the filename, get the latest.
+def load_model(filename, extras=None):
     if extras is not None:
         filename = filename + '.' + str(extras)
     model = None
     candidates = [os.path.join(MODEL_PATH, f) for f in os.listdir(MODEL_PATH) if filename in f]
     if len(candidates) > 0:
-        candidates = sorted(candidates, key=lambda f:os.stat(f).st_mtime, reverse=True)
+        candidates = sorted(candidates, key=lambda f: os.stat(f).st_mtime, reverse=True)
         filename = candidates[0]
         print("Loading", filename, "...")
         model = torch.load(filename)
         print("Done loading.")
     return model
 
-### Give a text description of the outcome of an episode and also a score
-### Score is duration, unless the agent died.
+
+# Give a text description of the outcome of an episode and also a score
+# Score is duration, unless the agent died.
 def episode_status(duration, reward):
     status = ""
     score = 0
@@ -220,17 +212,18 @@ def episode_status(duration, reward):
         score = duration
     return status, score
 
-############################################################
-### ReplayMemory
 
-### Store transitions to use to prevent catastrophic forgetting.
-### ReplayMemory implements a ring buffer. Items are placed into memory
-###    until memory reaches capacity, and then new items start replacing old items
-###    at the beginning of the array. 
-### Member variables:
-###    capacity: (int) number of transitions that can be stored
-###    memory: (array) holds transitions (state, action, next_state, reward)
-###    position: (int) index of current location in memory to place the next transition.
+############################################################
+# ReplayMemory
+
+# Store transitions to use to prevent catastrophic forgetting.
+# ReplayMemory implements a ring buffer. Items are placed into memory
+#    until memory reaches capacity, and then new items start replacing old items
+#    at the beginning of the array.
+# Member variables:
+#    capacity: (int) number of transitions that can be stored
+#    memory: (array) holds transitions (state, action, next_state, reward)
+#    position: (int) index of current location in memory to place the next transition.
 class ReplayMemory(object):
 
     def __init__(self, capacity):
@@ -238,51 +231,87 @@ class ReplayMemory(object):
         self.memory = []
         self.position = 0
 
-    ### Store a transition in memory.
-    ### To implement: put new items at the end of the memory array, unless capacity is reached.
-    ###    Combine the arguments into a new Transition object.
-    ###    If capacity is reached, start overwriting the beginning of the array.
-    ###    Use the position index to keep track of where to put the next item. 
+    # Store a transition in memory.
+    # To implement: put new items at the end of the memory array, unless capacity is reached.
+    #    Combine the arguments into a new Transition object.
+    #    If capacity is reached, start overwriting the beginning of the array.
+    #    Use the position index to keep track of where to put the next item.
     def push(self, state, action, next_state, reward):
-        ### WRITE YOUR CODE BELOW HERE
+        # WRITE YOUR CODE BELOW HERE DONE
 
-        ### WRITE YOUR CODE ABOVE HERE
+        transition = (state, action, next_state, reward)
+        if len(self.memory) < self.capacity:
+            self.memory.append(transition)
+        else:
+            self.memory[self.position] = transition
+            self.position += 1
+            self.position %= self.capacity
+
+        # WRITE YOUR CODE ABOVE HERE
         return None
 
-    ### Return a batch of transition objects from memory containing batch_size elements.
+    # Return a batch of transition objects from memory containing batch_size elements.
     def sample(self, batch_size):
         return random.sample(self.memory, batch_size)
 
-    ### This allows one to call len() on a ReplayMemory object. E.g. len(replay_memory)
+    # This allows one to call len() on a ReplayMemory object. E.g. len(replay_memory)
     def __len__(self):
         return len(self.memory)
 
+
 ##########################################################
-### DQN
+# DQN
 
 class DQN(nn.Module):
-
-    ### Create all the nodes in the computation graph.
-    ### We won't say how to put the nodes together into a computation graph. That is done
-    ### automatically when forward() is called.
+    # todo: tune the structure of this model
+    # Create all the nodes in the computation graph.
+    # We won't say how to put the nodes together into a computation graph. That is done
+    # automatically when forward() is called.
     def __init__(self, h, w, num_actions):
         super(DQN, self).__init__()
         self.num_actions = num_actions
-        ### WRITE YOUR CODE BELOW HERE
 
-        ### WRITE YOUR CODE ABOVE HERE
+        def conv_out_shape(length, kernel_size=5, stride=1):
+            return (length - kernel_size) // stride + 1
+
+        # WRITE YOUR CODE BELOW HERE DONE
+        kernel_size = 5
+        stride = 1
+        n_channels_1 = 32
+        self.conv1 = nn.Conv2d(3, n_channels_1, kernel_size, stride)
+        self.bn1 = nn.BatchNorm2d(n_channels_1)
+        h = conv_out_shape(h, kernel_size, stride)
+        w = conv_out_shape(w, kernel_size, stride)
+
+        n_channels_2 = 64
+        self.conv2 = nn.Conv2d(n_channels_1, n_channels_2, kernel_size, stride)
+        self.bn2 = nn.BatchNorm2d(n_channels_2)
+        h = conv_out_shape(h, kernel_size, stride)
+        w = conv_out_shape(w, kernel_size, stride)
+
+        self.fc = nn.Linear(h * w * n_channels_2, num_actions)
+
+        # WRITE YOUR CODE ABOVE HERE
 
     # Called with either one element to determine next action, or a batch
     # during optimization. Returns tensor([[left0exp,right0exp]...]).
     def forward(self, x):
         q_values = None
-        ### WRITE YOUR CODE BELOW HERE
+        # WRITE YOUR CODE BELOW HERE DONE
 
-        ### WRITE YOUR CODE ABOVE HERE
+        x = self.bn1(self.conv1(x))
+        x = F.relu(x)
+        x = self.bn2(self.conv2(x))
+        x = F.relu(x)
+        x = self.fc(x.view(x.size(0), -1))
+        q_values = x
+
+        # WRITE YOUR CODE ABOVE HERE
         return q_values
 
+
 ##########################################################
-### UNIT TESTING
+# UNIT TESTING
 
 def testReplayMemory():
     print("Testing ReplayMemory...")
@@ -290,18 +319,18 @@ def testReplayMemory():
     test_replay_memory = ReplayMemory(capacity)
     for i in range(capacity):
         test_replay_memory.push(i, i, i, i)
-    assert (len(test_replay_memory) == capacity),"size test failed"
+    assert (len(test_replay_memory) == capacity), "size test failed"
     for i in range(len(test_replay_memory)):
         item = test_replay_memory.memory[i]
         assert (item[0] == i), "item" + str(i) + "not holding the correct value"
-    for i in range(capacity//2):
-        test_replay_memory.push(capacity+i, capacity+i, capacity+i, capacity+i)
+    for i in range(capacity // 2):
+        test_replay_memory.push(capacity + i, capacity + i, capacity + i, capacity + i)
     assert (len(test_replay_memory) == capacity), "size test 2 failed"
     # check items
     for i in range(len(test_replay_memory)):
         item = test_replay_memory.memory[i]
         if i < capacity // 2:
-            assert (item[0] == i+capacity), "not holding the correct value after looping (first half)"
+            assert (item[0] == i + capacity), "not holding the correct value after looping (first half)"
         else:
             assert (item[0] == i), "not holding the correct value after looping (second half)"
     print("ReplayMemory test passed.")
@@ -325,11 +354,12 @@ def testMakeBatch():
         reward = torch.randn(1, 1, device=DEVICE)
         test_replay_memory.push(state, action, new_state, reward)
     states_batch, actions_batch, next_states_batch, rewards_batch, non_final_mask = doMakeBatch(test_replay_memory, batch_size)
-    assert(type(states_batch) == torch.Tensor and states_batch.size() == (batch_size, 3, 80, 80)), "states batch not correct shape."
-    assert(type(actions_batch) == torch.Tensor and actions_batch.size() == (batch_size, 1)), "actions batch not correct shape."
-    assert(type(next_states_batch) == torch.Tensor and next_states_batch.size() == (batch_size, 3, 80, 80)), "next states batch not correct shape."
-    assert(type(rewards_batch) == torch.Tensor and rewards_batch.size() == (batch_size, 1)), "rewards batch not correct shape."
-    assert(type(non_final_mask) == type(torch.tensor(batch_size, dtype=torch.bool, device=DEVICE)) and non_final_mask.size()[0] == batch_size), "non-final mask not correct shape."
+    assert (type(states_batch) == torch.Tensor and states_batch.size() == (batch_size, 3, 80, 80)), "states batch not correct shape."
+    assert (type(actions_batch) == torch.Tensor and actions_batch.size() == (batch_size, 1)), "actions batch not correct shape."
+    assert (type(next_states_batch) == torch.Tensor and next_states_batch.size() == (batch_size, 3, 80, 80)), "next states batch not correct shape."
+    assert (type(rewards_batch) == torch.Tensor and rewards_batch.size() == (batch_size, 1)), "rewards batch not correct shape."
+    assert (type(non_final_mask) == type(torch.tensor(batch_size, dtype=torch.bool, device=DEVICE)) and non_final_mask.size()[
+        0] == batch_size), "non-final mask not correct shape."
 
     # Test mask
     test_replay_memory = ReplayMemory(batch_size)
@@ -342,17 +372,20 @@ def testMakeBatch():
         reward = torch.randn(1, 1, device=DEVICE)
         test_replay_memory.push(state, action, new_state, reward)
     states_batch, actions_batch, next_states_batch, rewards_batch, non_final_mask = doMakeBatch(test_replay_memory, batch_size)
-    assert(non_final_mask.sum() == batch_size//2), "non_final_mask not masking properly."
+    assert (non_final_mask.sum() == batch_size // 2), "non_final_mask not masking properly."
     print("doMakeBatch test passed.")
     return True
+
 
 class UnitTestDQN(nn.Module):
     def __init__(self, h, w, num_actions):
         super(UnitTestDQN, self).__init__()
         self.num_actions = num_actions
+
     def forward(self, x):
-        assert(False), "Network should not be queried when epsilon = 1.0." 
+        assert (False), "Network should not be queried when epsilon = 1.0."
         return None
+
 
 def testSelectAction():
     print("Testing select_action...")
@@ -371,9 +404,9 @@ def testSelectAction():
     for j in range(num_tests):
         samples = {}
         for i in range(sample_size):
-            action, new_epsilon = select_action(state, net, num_actions, epsilon, steps_done = 0, bootstrap_threshold = 2)
-            assert(type(action) == torch.Tensor and action.size() == (1,1)), "Action not correct shape."
-            assert(new_epsilon == epsilon), "Epsilon should not change during bootstrapping."
+            action, new_epsilon = select_action(state, net, num_actions, epsilon, steps_done=0, bootstrap_threshold=2)
+            assert (type(action) == torch.Tensor and action.size() == (1, 1)), "Action not correct shape."
+            assert (new_epsilon == epsilon), "Epsilon should not change during bootstrapping."
             action = action.item()
             if action not in samples:
                 samples[action] = 0
@@ -381,9 +414,10 @@ def testSelectAction():
         expected = [sample_size / num_actions] * num_actions
         statistic, pvalue = chisquare(f_obs=list(samples.values()), f_exp=expected)
         test_results[pvalue >= significance_level] += 1
-    assert(test_results[True] > pass_rate * num_tests), "Random sample is not from uniform distribution."    
+    assert (test_results[True] > pass_rate * num_tests), "Random sample is not from uniform distribution."
     print("select_action test passed.")
     return True
+
 
 def chi_test():
     num_samples = 100000
@@ -391,7 +425,7 @@ def chi_test():
     state = torch.randn(1, 3, 80, 80, device=DEVICE)
 
     for i in range(num_samples):
-        action, new_epsilon = select_action(state, net, num_actions, epsilon, steps_done = 0, bootstrap_threshold = 2)
+        action, new_epsilon = select_action(state, net, num_actions, epsilon, steps_done=0, bootstrap_threshold=2)
         s = function_to_test()
 
         if s not in samples:
@@ -407,7 +441,6 @@ def chi_test():
     return test_result.pvalue >= significance_level
 
 
-
 def testPredictQValues():
     print("Testing doPredictQValues...")
     batch_size = 128
@@ -418,9 +451,10 @@ def testPredictQValues():
     states_batch = torch.randn(batch_size, 3, 80, 80, device=DEVICE)
     actions_batch = torch.randint(0, 7, (128, 1), device=DEVICE).long()
     state_action_values = doPredictQValues(net, states_batch, actions_batch)
-    assert(type(state_action_values) == torch.Tensor and state_action_values.size() == (128, 1)), "Return value not correct shape."
+    assert (type(state_action_values) == torch.Tensor and state_action_values.size() == (128, 1)), "Return value not correct shape."
     print("doPredictQValues test passed.")
     return True
+
 
 def testPredictNextStateUtilities():
     print("Testing doPredictNextStateUtilities...")
@@ -439,10 +473,11 @@ def testPredictNextStateUtilities():
                 next_states_batch[i].fill_(0)
                 non_final_mask[i] = 0
         next_state_values = doPredictNextStateUtilities(net, next_states_batch, non_final_mask, batch_size)
-        assert(type(next_state_values) == torch.Tensor and next_state_values.size() == (batch_size, 1)), "Return value not correct shape (attempt 1)."
+        assert (type(next_state_values) == torch.Tensor and next_state_values.size() == (
+            batch_size, 1)), "Return value not correct shape (attempt 1)."
         for i in range(batch_size):
             if i % 2 == 1:
-                assert(next_state_values[i].sum() == 0), "Element " + str(i) + "is not 0.0 when non_final_mask[i] = 0"
+                assert (next_state_values[i].sum() == 0), "Element " + str(i) + "is not 0.0 when non_final_mask[i] = 0"
         passed = True
     except RuntimeError as e:
         print(e)
@@ -450,11 +485,12 @@ def testPredictNextStateUtilities():
     if not passed:
         # Next option is that batch is not full sized.
         try:
-            next_states_batch = torch.ones(batch_size-1, 3, 80, 80, device=DEVICE)
+            next_states_batch = torch.ones(batch_size - 1, 3, 80, 80, device=DEVICE)
             non_final_mask = torch.ones(batch_size, dtype=torch.bool, device=DEVICE)
             non_final_mask[0] = 0
             next_state_values = doPredictNextStateUtilities(net, next_states_batch, non_final_mask, batch_size)
-            assert(type(next_state_values) == torch.Tensor and next_state_values.size()[0] == batch_size), "Return value not correctd shape (attempt 2)."
+            assert (type(next_state_values) == torch.Tensor and next_state_values.size()[
+                0] == batch_size), "Return value not correctd shape (attempt 2)."
             passed = True
         except RuntimeError as e:
             print(e)
@@ -462,7 +498,8 @@ def testPredictNextStateUtilities():
     if passed:
         print("doPredictNextStateUtilities test passed.")
         return True
-    assert(False), "doPredictNextStateUtilities did NOT pass test."
+    assert (False), "doPredictNextStateUtilities did NOT pass test."
+
 
 def testComputeExpectedQValues():
     print("Testing doComputeExpectedQValues...")
@@ -471,11 +508,13 @@ def testComputeExpectedQValues():
     next_state_values = torch.ones(batch_size)
     rewards_batch = torch.ones(batch_size)
     expected_state_action_values = doComputeExpectedQValues(next_state_values, rewards_batch, gamma)
-    assert(type(expected_state_action_values) == torch.Tensor and expected_state_action_values.size()[0] == batch_size), "Return value not expected shape."
+    assert (type(expected_state_action_values) == torch.Tensor and expected_state_action_values.size()[
+        0] == batch_size), "Return value not expected shape."
     for i in range(batch_size):
-        assert(expected_state_action_values[i] == 1.5), "Element " + str(i) + " doesn't have the correct value."
+        assert (expected_state_action_values[i] == 1.5), "Element " + str(i) + " doesn't have the correct value."
     print("doComputeExpectedQValues test passed.")
     return True
+
 
 def testComputeLoss():
     print("Testing doComputeLoss...")
@@ -483,7 +522,7 @@ def testComputeLoss():
     state_action_values = torch.randn(batch_size, device=DEVICE)
     expected_state_action_values = torch.randn(batch_size, device=DEVICE)
     loss = doComputeLoss(state_action_values, expected_state_action_values)
-    assert(type(loss) == torch.Tensor and len(loss.size()) == 0), "Loss not of expected shape."
+    assert (type(loss) == torch.Tensor and len(loss.size()) == 0), "Loss not of expected shape."
     print("doComputeLoss test passed.")
     return True
 
@@ -497,186 +536,243 @@ def unit_test():
     testComputeExpectedQValues()
     testComputeLoss()
 
-##########################################################
-### WORKER FUNCTIONS
 
-### Choose and instantiate an optimizer. A default example is given, which you can change.
-### Input:
-### - parameters: the DQN parameters
-### Output:
-### - the optimizer object
+##########################################################
+# WORKER FUNCTIONS
+
+# Choose and instantiate an optimizer. A default example is given, which you can change.
+# Input:
+# - parameters: the DQN parameters
+# Output:
+# - the optimizer object
 def initializeOptimizer(parameters):
     optimizer = None
-    ### WRITE YOUR CODE BELOW HERE
+    # WRITE YOUR CODE BELOW HERE DONE
 
-    ### WRITE YOUR CODE ABOVE HERE
+    print("initializing optimizer with parameters: ", parameters)
+    optimizer = optim.Adam(parameters)
+
+    # WRITE YOUR CODE ABOVE HERE
     return optimizer
 
-### Select an action to perform. 
-### If a random number [0..1] is greater than epsilon, then query the policy_network,
-### otherwise use a random action.
-### Inputs:
-### - state: a tensor of shape 3 x screen_height x screen_width
-### - policy_net: a DQN object
-### - num_actions: number of actions available
-### - epsilon: float [0..1] indicating whether to choose random or use the network
-### - steps_done: number of previously executed steps
-### - bootstrap_threshold: number of steps that must be executed before training begins
-### This function should return:
-### - A tensor of shape 1 x 1 that contains the number of the action to execute
-### - The new epsilon value to use next time
-def select_action(state, policy_net, num_actions, epsilon, steps_done = 0, bootstrap_threshold = 0):
+
+# Select an action to perform.
+# If a random number [0..1] is greater than epsilon, then query the policy_network,
+# otherwise use a random action.
+# Inputs:
+# - state: a tensor of shape 3 x screen_height x screen_width
+# - policy_net: a DQN object
+# - num_actions: number of actions available
+# - epsilon: float [0..1] indicating whether to choose random or use the network
+# - steps_done: number of previously executed steps
+# - bootstrap_threshold: number of steps that must be executed before training begins
+# This function should return:
+# - A tensor of shape 1 x 1 that contains the number of the action to execute
+# - The new epsilon value to use next time
+def select_action(state, policy_net, num_actions, epsilon, steps_done=0, bootstrap_threshold=0):
     action = None
     new_epsilon = epsilon
-    ### WRITE YOUR CODE BELOW HERE
+    # WRITE YOUR CODE BELOW HERE DOING
+    # A good schedule for epsilon could be linear in terms
+    # of the number of steps or exponential, asymptoting
+    # to zero
+    if random.random() < epsilon:  # random
+        action = torch.tensor([[random.randrange(num_actions)]], device=DEVICE, dtype=torch.long)
+    else:  # greedy
+        action = policy_net(state).max(1)[1].view(1, 1)
 
-    ### WRITE YOUR CODE ABOVE HERE
+    if steps_done > bootstrap_threshold:
+        new_epsilon = 0.5 ** (steps_done / 5000)
+
+    # WRITE YOUR CODE ABOVE HERE
     return action, new_epsilon
 
-### Ask for a batch of experience replays.
-### Inputs:
-### - replay_memory: A ReplayMemory object
-### - batch_size: size of the batch to return
-### Outputs:
-### - states_batch: a tensor of shape batch_size x 3 x screen_height x screen_width
-### - actions_batch: a tensor of shape batch_size x 1 containing action numbers
-### - next_states_batch: a tensor containing screens. 
-### - rewards_batch: a tensor of shape batch_size x 1 containing reward values.
-### - non_final_mask: a tensor of bytes of length batch_size containing a 0 if the state is terminal or 1 otherwise
-def doMakeBatch(replay_memory, batch_size):
-    states_batch = None
-    actions_batch = None
-    next_states_batch = None
-    rewards_batch = None
-    non_final_mask = None
-    ### WRITE YOUR CODE BELOW HERE
 
-    ### WRITE YOUR CODE ABOVE HERE
+# Ask for a batch of experience replays.
+# Inputs:
+# - replay_memory: A ReplayMemory object
+# - batch_size: size of the batch to return
+# Outputs:
+# - states_batch: a tensor of shape batch_size x 3 x screen_height x screen_width
+# - actions_batch: a tensor of shape batch_size x 1 containing action numbers
+# - next_states_batch: a tensor containing screens.
+# - rewards_batch: a tensor of shape batch_size x 1 containing reward values.
+# - non_final_mask: a tensor of bytes of length batch_size containing a 0 if the state is terminal or 1 otherwise
+def doMakeBatch(replay_memory, batch_size):
+    states_batch = []
+    actions_batch = []
+    next_states_batch = []
+    rewards_batch = []
+    non_final_mask = []
+    # WRITE YOUR CODE BELOW HERE DONE
+
+    samples = replay_memory.sample(batch_size)
+    for state, action, next_state, reward in samples:
+        states_batch.append(state)
+        actions_batch.append(action)
+        next_states_batch.append(next_state)
+        rewards_batch.append(reward)
+        non_final_mask.append((next_state is not None))
+
+    states_batch = torch.cat(states_batch, 0)
+    actions_batch = torch.cat(actions_batch, 0)
+    next_states_batch = torch.cat(next_states_batch, 0)
+    rewards_batch = torch.cat(rewards_batch, 0)
+    non_final_mask = torch.tensor(non_final_mask)
+
+    # WRITE YOUR CODE ABOVE HERE
     return states_batch, actions_batch, next_states_batch, rewards_batch, non_final_mask
 
 
-### Ask the policy_net to predict the Q value for a batch of states and a batch of actions.
-### Inputs:
-### - policy_net: the DQN
-### - states_batch: a tensor of shape batch_size x 3 x screen_height x screen_width containing screens
-### - actions_batch: a tensor of shape batch_size x 1 containing action numbers
-### Output:
-### - A tensor of shape batch_size x 1 containing the Q-value predicted by the DQN in the position indicated by the action
+# Ask the policy_net to predict the Q value for a batch of states and a batch of actions.
+# Inputs:
+# - policy_net: the DQN
+# - states_batch: a tensor of shape batch_size x 3 x screen_height x screen_width containing screens
+# - actions_batch: a tensor of shape batch_size x 1 containing action numbers
+# Output:
+# - A tensor of shape batch_size x 1 containing the Q-value predicted by the DQN in the position indicated by the action
 def doPredictQValues(policy_net, states_batch, actions_batch):
     state_action_values = None
-    ### WRITE YOUR CODE BELOW HERE
+    # WRITE YOUR CODE BELOW HERE DONE
 
-    ### WRITE YOUR CODE ABOVE HERE
+    output = policy_net(states_batch)
+    state_action_values = torch.gather(output, 1, actions_batch)
+
+    # WRITE YOUR CODE ABOVE HERE
     return state_action_values
 
-### Ask the policy_net to predict the utility of a next_state.
-### Inputs:
-### - policy_net: The DQN
-### - next_states_batch: a tensor of shape batch_size x 3 x screen_height x screen_width
-### - non_final_mask: a tensor of length batch_size containing 0 for terminal states and 1 for non-terminal states
-### - batch_size: the batch size
-### Note: Only run non-terminal states through the policy_net
-### Output:
-### - A tensor of shape batch_size x 1 containing Q-values
+
+# Ask the policy_net to predict the utility of a next_state.
+# Inputs:
+# - policy_net: The DQN
+# - next_states_batch: a tensor of shape batch_size x 3 x screen_height x screen_width
+# - non_final_mask: a tensor of length batch_size containing 0 for terminal states and 1 for non-terminal states
+# - batch_size: the batch size
+# Note: Only run non-terminal states through the policy_net
+# Output:
+# - A tensor of shape batch_size x 1 containing Q-values
 def doPredictNextStateUtilities(policy_net, next_states_batch, non_final_mask, batch_size):
     next_state_values = torch.zeros(batch_size, device=DEVICE)
-    ### WRITE YOUR CODE BELOW HERE
+    # WRITE YOUR CODE BELOW HERE DONE
 
-    ### WRITE YOUR CODE ABOVE HERE
+    new_input = [next_states_batch[i] for i in range(batch_size) if non_final_mask[i]]
+    new_input = torch.tensor(new_input, device=DEVICE)
+
+    new_output = policy_net(new_input)
+    new_output, _ = torch.max(new_output, 1)
+
+    j = 0
+    for i in range(batch_size):
+        if non_final_mask[i]:
+            next_state_values[i] = new_output[j]
+            j += 1
+
+    # WRITE YOUR CODE ABOVE HERE
     return next_state_values.detach()
 
-### Compute the Q-update equation Q(s_t, a_t) = R(s_t+1) + gamma * argmax_a' Q(s_t+1, a')
-### Inputs:
-### - next_state_values: a tensor of shape batch_size x 1 containing Q values for state s_t+1
-### - rewards_batch: a tensor or shape batch_size x 1 containing reward values for state s_t+1
-### Output:
-### - A tensor of shape batch_size x 1
+
+# Compute the Q-update equation Q(s_t, a_t) = R(s_t+1) + gamma * argmax_a' Q(s_t+1, a')
+# Inputs:
+# - next_state_values: a tensor of shape batch_size x 1 containing Q values for state s_t+1
+# - rewards_batch: a tensor or shape batch_size x 1 containing reward values for state s_t+1
+# Output:
+# - A tensor of shape batch_size x 1
 def doComputeExpectedQValues(next_state_values, rewards_batch, gamma):
     expected_state_action_values = None
-    ### WRITE YOUR CODE BELOW HERE
+    # WRITE YOUR CODE BELOW HERE DONE
 
-    ### WRITE YOUR CODE ABOVE HERE
+    expected_state_action_values = rewards_batch + gamma * next_state_values.max(1)[0]
+
+    # WRITE YOUR CODE ABOVE HERE
     return expected_state_action_values
 
-### Compute the loss
-### Inputs:
-### - state_action_values: a tensor of shape batch_size x 1 containing Q values
-### - expected_state_action_values: a tensor of shape batch_size x 1 containing updated Q values
-### Output:
-### - A tensor scalar value
+
+# Compute the loss
+# Inputs:
+# - state_action_values: a tensor of shape batch_size x 1 containing Q values
+# - expected_state_action_values: a tensor of shape batch_size x 1 containing updated Q values
+# Output:
+# - A tensor scalar value
 def doComputeLoss(state_action_values, expected_state_action_values):
     loss = None
-    ### WRITE YOUR CODE BELOW HERE
+    # WRITE YOUR CODE BELOW HERE DONE
 
-    ### WRITE YOUR CODE ABOVE HERE
+    loss_func = nn.SmoothL1Loss()
+    loss = loss_func(state_action_values, expected_state_action_values)
+
+    # WRITE YOUR CODE ABOVE HERE
     return loss
 
-### Run backpropagation. Make sure gradients are clipped between -1 and +1.
-### Inputs:
-### - loss: a tensor scalar
-### - parameters: the parameters of the DQN
-### There is no output
-def doBackprop(loss, parameters):
-    ### WRITE YOUR CODE BELOW HERE
 
-    ### WRITE YOUR CODE ABOVE HERE
+# Run backpropagation. Make sure gradients are clipped between -1 and +1.
+# Inputs:
+# - loss: a tensor scalar
+# - parameters: the parameters of the DQN
+# There is no output
+def doBackprop(loss, parameters):
+    # WRITE YOUR CODE BELOW HERE DONE
+    print("in doBackprop", parameters)
+    loss.backward()
+    # WRITE YOUR CODE ABOVE HERE
     return None
 
 
-
 #########################################################
-### OPTIMIZE
+# OPTIMIZE
 
-### Take a DQN and do one forward-backward pass.
-### Since this is Q-learning, we will run a forward pass to get Q-values for state-action pairs and then 
-### give the true value as the Q-values after the Q-update equation.
+# Take a DQN and do one forward-backward pass.
+# Since this is Q-learning, we will run a forward pass to get Q-values for state-action pairs and then
+# give the true value as the Q-values after the Q-update equation.
 def optimize_model(policy_net, target_net, replay_memory, optimizer, batch_size, gamma):
     if len(replay_memory) < batch_size:
         return
-    ### step 1: sample from the replay memory. Get BATCH_SIZE transitions
-    ### Step 2: Get a list of non-final next states.
-    ###         a. Create a mask, a tensor of length BATCH_SIZE where each element i is 1 if 
-    ###            batch.next_state[i] is not None and 0 otherwise.
-    ###         b. Create a tensor of shape [BATCH_SIZE, color(3), height, width] by concatenating
-    ###            all non-final (not None) batch.next_states together.
-    ### Step 3: set up batches for state, action, and reward
-    ###         a. Create a tensor of shape [BATCH_SIZE, color(3), height, width] holding states
-    ###         b. Create a tensor of shape [BATCH_SIZE, 1] holding actions
-    ###         c. Create a tensor of shape [BATCH_SIZE, 1] holding rewards
+    # step 1: sample from the replay memory. Get BATCH_SIZE transitions
+    # Step 2: Get a list of non-final next states.
+    #         a. Create a mask, a tensor of length BATCH_SIZE where each element i is 1 if
+    #            batch.next_state[i] is not None and 0 otherwise.
+    #         b. Create a tensor of shape [BATCH_SIZE, color(3), height, width] by concatenating
+    #            all non-final (not None) batch.next_states together.
+    # Step 3: set up batches for state, action, and reward
+    #         a. Create a tensor of shape [BATCH_SIZE, color(3), height, width] holding states
+    #         b. Create a tensor of shape [BATCH_SIZE, 1] holding actions
+    #         c. Create a tensor of shape [BATCH_SIZE, 1] holding rewards
     states_batch, actions_batch, next_states_batch, rewards_batch, non_final_mask = doMakeBatch(replay_memory, batch_size)
 
-    ### Step 4: Get the action values predicted.
-    ###         a. Call policy_net(state_batch) to get a tensor of shape [BATCH_SIZE, NUM_ACTIONS] containing Q-values
-    ###         b. For each batch, get the Q-value for the corresponding action in action_batch (hint: torch.gather)
+    # Step 4: Get the action values predicted.
+    #         a. Call policy_net(state_batch) to get a tensor of shape [BATCH_SIZE, NUM_ACTIONS] containing Q-values
+    #         b. For each batch, get the Q-value for the corresponding action in action_batch (hint: torch.gather)
     state_action_values = doPredictQValues(policy_net, states_batch, actions_batch)
 
-    ### Step 5: Get the utility values of next_states.
+    # Step 5: Get the utility values of next_states.
     next_state_values = doPredictNextStateUtilities(target_net, next_states_batch, non_final_mask, batch_size)
-    
-    ### Step 6: Compute the expected Q values.
+
+    # Step 6: Compute the expected Q values.
     expected_state_action_values = doComputeExpectedQValues(next_state_values, rewards_batch, gamma)
 
-    ### Step 7: Computer Huber loss (smooth L1 loss)
-    ###         Compare state action values from step 5 to expected state action values from step 7
+    # Step 7: Computer Huber loss (smooth L1 loss)
+    #         Compare state action values from step 5 to expected state action values from step 7
     loss = doComputeLoss(state_action_values, expected_state_action_values)
-    ### Step 8: Back propagation
-    ###         a. Zero out gradients
-    ###         b. call loss.backward()
-    ###         c. Prevent gradient explosion by clipping gradients between -1 and 1
-    ###            (hint: param.grad.data is the gradients. See torch.clamp_() )
-    ###         d. Tell the optimizer that another step has occurred: optimizer.step()
+    # Step 8: Back propagation
+    #         a. Zero out gradients
+    #         b. call loss.backward()
+    #         c. Prevent gradient explosion by clipping gradients between -1 and 1
+    #            (hint: param.grad.data is the gradients. See torch.clamp_() )
+    #         d. Tell the optimizer that another step has occurred: optimizer.step()
     if optimizer is not None:
         optimizer.zero_grad()
         doBackprop(loss, policy_net.parameters())
         optimizer.step()
 
-##########################################################
-### MAIN
 
-### Training loop.
-### Each episode is a game that runs until the agent gets the coin or the game times out.
-### Train for a given number of episodes.
-def train(num_episodes = NUM_EPISODES, load_filename = None, save_filename = None, eval_interval = EVAL_INTERVAL, replay_capacity = REPLAY_CAPACITY, bootstrap_threshold = BOOTSTRAP, epsilon = EPSILON, eval_epsilon = EVAL_EPSILON, gamma = GAMMA, batch_size = BATCH_SIZE, target_update = TARGET_UPDATE, random_seed = RANDOM_SEED, num_levels = NUM_LEVELS, seed = SEED):
+##########################################################
+# MAIN
+
+# Training loop.
+# Each episode is a game that runs until the agent gets the coin or the game times out.
+# Train for a given number of episodes.
+def train(num_episodes=NUM_EPISODES, load_filename=None, save_filename=None, eval_interval=EVAL_INTERVAL, replay_capacity=REPLAY_CAPACITY,
+          bootstrap_threshold=BOOTSTRAP, epsilon=EPSILON, eval_epsilon=EVAL_EPSILON, gamma=GAMMA, batch_size=BATCH_SIZE, target_update=TARGET_UPDATE,
+          random_seed=RANDOM_SEED, num_levels=NUM_LEVELS, seed=SEED):
     # Set the random seed
     if random_seed is not None:
         random.seed(random_seed)
@@ -715,31 +811,31 @@ def train(num_episodes = NUM_EPISODES, load_filename = None, save_filename = Non
     target_net = DQN(screen_height, screen_width, env.NUM_ACTIONS).to(DEVICE)
     target_net.load_state_dict(policy_net.state_dict())
     target_net.eval()
-    
+
     # Instantiate the optimizer
     optimizer = None
     if len(list(policy_net.parameters())) > 0:
         optimizer = initializeOptimizer(policy_net.parameters())
-    
+
     # Instantiate the replay memory
     replay_memory = ReplayMemory(replay_capacity)
 
-    steps_done = 0               # How many steps have been run
-    best_eval = float('inf')     # The best model evaluation to date
+    steps_done = 0  # How many steps have been run
+    best_eval = float('inf')  # The best model evaluation to date
 
-    ### Do training until episodes complete 
+    # Do training until episodes complete
     print("training...")
-    i_episode = 0            # The episode number
-    
+    i_episode = 0  # The episode number
+
     # Stop when we reach max episodes
     while i_episode < num_episodes:
         print("episode:", i_episode, "epsilon:", epsilon)
-        max_reward = 0       # The best reward we've seen this episode
-        done = False         # Has the game ended (timed out or got the coin)
-        episode_steps = 0    # Number of steps performed in this episode
+        max_reward = 0  # The best reward we've seen this episode
+        done = False  # Has the game ended (timed out or got the coin)
+        episode_steps = 0  # Number of steps performed in this episode
         # Initialize the environment and state
         env.reset()
-        
+
         # Current screen. There is no last screen because we get velocity on the screen itself.
         state = get_screen(env)
 
@@ -749,18 +845,18 @@ def train(num_episodes = NUM_EPISODES, load_filename = None, save_filename = Non
             action, epsilon = select_action(state, policy_net, env.NUM_ACTIONS, epsilon, steps_done, bootstrap_threshold)
             steps_done = steps_done + 1
             episode_steps = episode_steps + 1
-            
+
             # for debugging
             if RENDER_SCREEN and not IN_PYNB:
-                env.render() 
+                env.render()
 
-            # Run the action in the environment
-            if action is not None: 
+                # Run the action in the environment
+            if action is not None:
                 _, reward, done, _ = env.step(np.array([action.item()]))
 
                 # Record if this was the best reward we've seen so far
                 max_reward = max(reward, max_reward)
-                
+
                 # Turn the reward into a tensor  
                 reward = torch.tensor([reward], device=DEVICE)
 
@@ -781,11 +877,11 @@ def train(num_episodes = NUM_EPISODES, load_filename = None, save_filename = Non
 
                 # If we are past bootstrapping we should perform one step of the optimization
                 if steps_done > bootstrap_threshold:
-                  optimize_model(policy_net, target_net if target_update > 0 else policy_net, replay_memory, optimizer, batch_size, gamma)
+                    optimize_model(policy_net, target_net if target_update > 0 else policy_net, replay_memory, optimizer, batch_size, gamma)
             else:
                 # Do nothing if select_action() is not implemented and returning None
                 env.step(np.array([0]))
-                
+
             # If we are done, print some statistics
             if done:
                 print("duration:", episode_steps)
@@ -797,11 +893,11 @@ def train(num_episodes = NUM_EPISODES, load_filename = None, save_filename = Non
             # Should we update the target network?
             if target_update > 0 and i_episode % target_update == 0:
                 target_net.load_state_dict(policy_net.state_dict())
-                
+
         # Should we evaluate?
         if steps_done > bootstrap_threshold and i_episode > 0 and i_episode % eval_interval == 0:
-            test_average_duration = 0       # Track the average eval duration
-            test_average_max_reward = 0     # Track the average max reward
+            test_average_duration = 0  # Track the average eval duration
+            test_average_max_reward = 0  # Track the average max reward
             # copy all the weights into the evaluation network
             eval_net.load_state_dict(policy_net.state_dict())
             # Evaluate 10 times
@@ -809,7 +905,7 @@ def train(num_episodes = NUM_EPISODES, load_filename = None, save_filename = Non
                 # Call the evaluation function
                 test_duration, test_max_reward = evaluate(eval_net, eval_epsilon, env)
                 status, score = episode_status(test_duration, test_max_reward)
-                test_duration = score # Set test_duration to score to factor in death-penalty
+                test_duration = score  # Set test_duration to score to factor in death-penalty
                 test_average_duration = test_average_duration + test_duration
                 test_average_max_reward = test_average_max_reward + test_max_reward
             test_average_duration = test_average_duration / EVAL_COUNT
@@ -824,21 +920,19 @@ def train(num_episodes = NUM_EPISODES, load_filename = None, save_filename = Non
             print(' ')
         # Only increment episode number if we are done with bootstrapping
         if steps_done > bootstrap_threshold:
-          i_episode = i_episode + 1
+            i_episode = i_episode + 1
     print('Training complete')
     if RENDER_SCREEN and not IN_PYNB:
         env.render()
     env.close()
     return policy_net
- 
- 
- 
 
-### Evaluate the DQN
-### If environment is given, use that. Otherwise make a new environment.
-def evaluate(policy_net, epsilon = EVAL_EPSILON, env = None, test_seed = SEED):
+
+# Evaluate the DQN
+# If environment is given, use that. Otherwise make a new environment.
+def evaluate(policy_net, epsilon=EVAL_EPSILON, env=None, test_seed=SEED):
     setup_utils.setup_and_load(use_cmd_line_args=False, is_high_res=True, num_levels=NUM_LEVELS, set_seed=test_seed)
-    
+
     # Make an environment if we don't already have one
     if env is None:
         env = make('standard', num_envs=1)
@@ -859,9 +953,9 @@ def evaluate(policy_net, epsilon = EVAL_EPSILON, env = None, test_seed = SEED):
     # Current screen. There is no last screen
     state = get_screen(env)
 
-    steps_done = 0         # Number of steps executed
-    max_reward = 0         # Max reward seen
-    done = False           # Is the game over?
+    steps_done = 0  # Number of steps executed
+    max_reward = 0  # Max reward seen
+    done = False  # Is the game over?
 
     print("Evaluating...")
     while not done:
@@ -894,13 +988,13 @@ def evaluate(policy_net, epsilon = EVAL_EPSILON, env = None, test_seed = SEED):
     return steps_done, max_reward
 
 
-if __name__== "__main__":
+if __name__ == "__main__":
     if not IN_PYNB:
         if args.unit_test:
             unit_test()
         elif args.eval:
             if args.load is not None and os.path.isfile(os.path.join(MODEL_PATH, args.load)):
-                eval_net = load_model(args.load) 
+                eval_net = load_model(args.load)
                 print(eval_net)
                 for _ in range(EVAL_COUNT):
                     evaluate(eval_net, EVAL_EPSILON)
